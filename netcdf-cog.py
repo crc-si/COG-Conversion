@@ -533,9 +533,6 @@ def main(netcdf_path, output_dir, base_url, product, subfolder):
         print("Base URL:", base_url)
         print("Product:", product)
 
-    # Sanity checks the existence of base_url with product subdir
-    # Non-fatal warning if URL/subdir does not exist.
-#    sanity_check(base_url, product)
     create_cog = "Yes"
     if "Yes" in create_cog:
         for this_path, subdirs, files in os.walk(netcdf_path):
