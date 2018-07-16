@@ -38,13 +38,30 @@ import requests
 # ------------------------------------------------------------------------------
 start_time = datetime.datetime.now()
 prev_time = start_time
-
+cumul_time = 0
 
 def time_it(step):
-    global prev_time
+    global prev_time, cumul_time
     now = datetime.datetime.now()
     elapsed = now - prev_time
-    print("**** {}. Elapsed: {} sec".format(step,elapsed))
+    elapsed = round(elapsed.total_seconds())
+    cumul_time += elapsed
+    disp_time = 0
+    unit = 'seconds'
+    
+    if cumul_time > 3600:
+            disp_time = float(cumul_time / 3600) # Hours
+            unit = 'hr.'
+    elif cumul_time > 60:
+            disp_time = float(cumul_time / 60) # Minutes
+            unit = 'min.'
+    else:
+            disp_time = float(cumul_time) # Seconds
+            unit = 'sec.'
+    
+    total_time = "{0:.2f}".format(disp_time)
+    print("    **** {}. Elapsed: {} sec. Cumul time: {} {}".format\
+        (step, elapsed, total_time, unit))
     prev_time = now
     
 
@@ -83,7 +100,10 @@ def create_item_dict(item, ard_metadata, base_url, ard_metadata_file,
         'properties': {
             'datetime': center_dt,
             'provider': 'Geoscience Australia',
-            'license': 'PDDL-1.0'
+            'license': 'CC BY Attribution 4.0 International License',
+            'instrument': ard_metadata['instrument']['name'],
+            'platform': ard_metadata['platform']['code'],
+            'product_type': ard_metadata['product_type']
         },
         'links': {
             "self": {
@@ -92,12 +112,7 @@ def create_item_dict(item, ard_metadata, base_url, ard_metadata_file,
             }
         },
         'assets': {
-            'map': {
-                'href': base_url + item + '/map.html',
-                'required': 'true',
-                'type': 'html'
-            },
-            'metadata': {
+            'YAML': {
                 'href': base_url + item + "/" + ard_metadata_file,
                 "required": 'true',
                 "type": "yaml"
@@ -110,8 +125,16 @@ def create_item_dict(item, ard_metadata, base_url, ard_metadata_file,
         item_dict['assets'][key] = {
             'href': path,
             "required": 'true',
-            "type": "GeoTIFF",
-            "eo:band": [band_num]}
+            "type": "GeoTIFF"
+        }
+        # Metadata is for each band.
+        band_metadata = path + '.aux.xml'
+        key_metadata = key + '_metadata'
+        item_dict['assets'][key_metadata] = {
+            'href': band_metadata,
+            "required": 'false',
+            "type": "xml"
+        }
     return item_dict
 
 
@@ -134,7 +157,7 @@ def create_geodata(valid_coord):
     }
 
 
-def create_catalogs(base_url, pr_tile_item, tiles_list, verbose):
+def create_catalogs(base_url, output_dir, pr_tile_item, tiles_list, verbose):
     """
     There are several catalogs to be craeted as below.
 
@@ -149,17 +172,21 @@ def create_catalogs(base_url, pr_tile_item, tiles_list, verbose):
 
     """
     product = pr_tile_item[0]
-    item = pr_tile_item[1]
-    item_json_file = pr_tile_item[2]
+    tile = pr_tile_item[1]
 
-#  Create a catalog.json for each item in the same directory as the GeoTIFFs
-    name = item_json_file.replace('_STAC.json', '')
+    tile_dir = os.path.join(output_dir, tile, "")
+    items_list = os.listdir(tile_dir)
+    item_jsons = []
+    for item_json in items_list:
+        if ".json" in item_json and not "catalog" in item_json:
+            item_jsons.append({"href": item_json, "rel": "item"})
     catalog = {
-        "name": name,
+        "name": tile,
+        "license": 'CC BY Attribution 4.0 International License',
         "links":
         [
             {
-                "href": base_url + product + "/" + item + '/catalog.json',
+                "href": base_url + product + "/" + tile + '/catalog.json',
                 "rel": "self"
             },
             {
@@ -169,109 +196,90 @@ def create_catalogs(base_url, pr_tile_item, tiles_list, verbose):
             {
                 "href": base_url + product + '/catalog.json',
                 "rel": "root"
-            },
-            {
-                "href": item_json_file,
-                "rel": "item"
             }
-        ]
+        ],
+        "contact": {
+            "name": "Director, DEA Technologies, Geoscience Australia",
+            "email": "David.Gavin@ga.gov.au",
+            "phone": "+61 2 6249 9545",
+            "url": "http://www.ga.gov.au"
+        },
+        "formats": ["geotiff", "cog"],
+        "provider": {
+            "scheme": "s3",
+            "region": "ap-southeast-2",
+            "requesterPays": "false"
+        }
     }
+    for item_json in item_jsons:
+        catalog['links'].append(item_json)
     with open('catalog.json', 'w') as dest:
         json.dump(catalog, dest, indent=1)
 
-# Parent catalog for the item(s) in the immediate parent dir. Create once.
+    # Root catalog for the item(s) catalog.
     parent_catalog = '../catalog.json'
-    if not os.path.exists(parent_catalog):
-        parents_n_children = [
-            {
-                "href": base_url + product + '/catalog.json',
-                "rel": "self"
-            },
-            {
-                "href": base_url + product + '/catalog.json',
-                "rel": "parent"
-            },
-            {
-                "href": base_url + product + '/catalog.json',
-                "rel": "root"
+    parents_n_children = [
+        {
+            "href": base_url + product + '/catalog.json',
+            "rel": "self"
+        },
+        {
+            "href": base_url + product + '/catalog.json',
+            "rel": "parent"
+        },
+        {
+            "href": base_url + product + '/catalog.json',
+            "rel": "root"
+        },
+        {
+            "license": 'CC BY Attribution 4.0 International License'
+        },
+        {
+            "contact": {
+                "name": "Director, DEA Technologies, Geoscience Australia",
+                "email": "David.Gavin@ga.gov.au",
+                "phone": "+61 2 6249 9545",
+                "url": "http://www.ga.gov.au"
             }
-        ]
-        for tile in tiles_list:
-            tile_catalog = tile + "/catalog.json"
-            parents_n_children.append({"href": tile_catalog, "rel": "child"})
-        catalog = {
-            "name": product,
-            "links": parents_n_children
+        },
+        {
+            "formats": ["geotiff", "cog"]
+        },
+        {
+            "provider": {
+                "scheme": "s3",
+                "region": "ap-southeast-2",
+                "requesterPays": "false"
+            }
         }
-        with open(parent_catalog, 'w') as dest:
-            json.dump(catalog, dest, indent=1)
-
-    else:
-        if verbose:
-            print("""Parent catalog exists. Not overwriting!""")
-
-
-def create_one_json(base_url, output_dir, tile, product, verbose):
-    """
-    Iterate through all tile directories and create a JSON file for each
-    YAML file in there. These JSONs will be saved as *_STAC.json.
-
-    A 'catalog.json' will be created in the tile directory, and its parent
-    is written in the directory above it. This will list all tiles as child.
-
-    This function is called after the COGs are created in output_dir.
-    """
-#    tiles_list = os.listdir(output_dir)
-#    for tile in tiles_list:
-    #  Each item in the input_dir is a tile.
-    #  Find the list of files in its subdir.
-    tile_dir = os.path.join(output_dir, tile, "")
-    if os.path.exists(tile_dir):
-        if verbose:
-            print("Analysing {}".format(tile_dir))
-        os.chdir(tile_dir)
-        for ard_metadata_file in glob.glob("*.yaml"):
-            item_json_file = ard_metadata_file.replace('.yaml',
-                                                       "_STAC.json")
-            try:
-                with open(ard_metadata_file) as ard_src:
-                    ard_metadata = yaml.safe_load(ard_src)
-
-                if verbose:
-                    print("Creating the JSON dictionary structure.")
-                item_dict = create_item_dict(tile, ard_metadata,
-                                             base_url, ard_metadata_file,
-                                             item_json_file)
-
-                #  Write out the Item JSON file.
-                if verbose:
-                    print("Writing: {}/{}".format(tile, item_json_file))
-                with open(item_json_file, 'w') as dest:
-                    json.dump(item_dict, dest, indent=1)
-
-                #  Write out the 'catalog.json' files for item and parents.
-                if verbose:
-                    print("Writing the catalog.json for: {}".format(tile))
-                create_catalogs(base_url, [product, tile, item_json_file],
-                                tiles_list, verbose)
-
-            except NameError:
-                print("*** ERROR: *** Some variable(s) not defined")
-
-def create_jsons(base_url, output_dir, product, verbose):
-    """
-    Iterate through all tile directories and create a JSON file for each
-    YAML file in there. These JSONs will be saved as *_STAC.json.
-
-    A 'catalog.json' will be created in the tile directory, and its parent
-    is written in the directory above it. This will list all tiles as child.
-
-    This function is called after the COGs are created in output_dir.
-    """
-    tiles_list = os.listdir(output_dir)
+    ]
     for tile in tiles_list:
-        #  Each item in the input_dir is a tile.
-        #  Find the list of files in its subdir.
+        tile_catalog = tile + "/catalog.json"
+        parents_n_children.append({"href": tile_catalog, "rel": "child"})
+    catalog = {
+        "name": product,
+        "links": parents_n_children
+    }
+    with open(parent_catalog, 'w') as dest:
+        json.dump(catalog, dest, indent=1)
+
+
+def create_jsons(base_url, output_dir, product, verbose, subfolder):
+    """
+    Iterate through all tile directories and create a JSON file for each
+    YAML file in there. These JSONs will be saved as *_STAC.json.
+
+    A 'catalog.json' will be created in the tile directory, and its parent
+    is written in the directory above it. This will list all tiles as child.
+
+    This function is called after the COGs are created in output_dir.
+    """
+    tiles_list = [ name for name in os.listdir(output_dir)
+        if os.path.isdir(os.path.join(output_dir, name)) ]
+    for tile in tiles_list:
+        # Process only the specified tile, just as in creating COGs
+        if subfolder not in tile:
+            continue
         tile_dir = os.path.join(output_dir, tile, "")
         if os.path.exists(tile_dir):
             if verbose:
@@ -296,15 +304,13 @@ def create_jsons(base_url, output_dir, product, verbose):
                     with open(item_json_file, 'w') as dest:
                         json.dump(item_dict, dest, indent=1)
 
-                    #  Write out the 'catalog.json' files for item and parents.
-                    if verbose:
-                        print("Writing the catalog.json for: {}".format(tile))
-                    create_catalogs(base_url, [product, tile, item_json_file],
-                                    tiles_list, verbose)
-
                 except NameError:
                     print("*** ERROR: *** Some variable(s) not defined")
-        break  # Comment this out to process all tiles in the directory.
+    if verbose:
+        print("Writing the catalog.json for: {}".format(tile))
+    create_catalogs(base_url, output_dir, [product, tile],
+                    tiles_list, verbose)
+    time_it(4)
 
 
 # ------------------------------------------------------------------------------
@@ -329,7 +335,7 @@ def check_dir(fname):
     file_name = fname.split('/')
     rel_path = pjoin(*file_name[-2:])
     file_wo_extension, extension = splitext(rel_path)
-    logging.info("Ext: %s", extension)  # Just to avoid a pylint warning
+    logging.info("Ext: %s", extension)  # Keep it to avoid a pylint warning
     return file_wo_extension
 
 
@@ -412,10 +418,11 @@ def _write_cogtiff(out_f_name, outdir, subdatasets, rastercount):
     """
     with tempfile.TemporaryDirectory() as tmpdir:
         for netcdf in subdatasets[:-1]:
-            print(netcdf)
-#            time_it(2)
             for count in range(1, rastercount + 1):
                 band_name = get_bandname(netcdf[0])
+                
+                # In the case of FC Percentile, skip two bands as below.
+                # It does not apply in FC Products
                 if band_name.endswith('_observed_date') or band_name.endswith('_source'):
                     continue
                     
@@ -524,7 +531,6 @@ def main(netcdf_path, output_dir, base_url, product, subfolder):
                         level=logging.INFO)
     # Add the ending slash if not present
     netcdf_path = os.path.join(netcdf_path, subfolder)
-    print(netcdf_path)
     output_dir = os.path.join(output_dir, '')
     base_url = os.path.join(base_url, '')
     if verbose:
@@ -533,7 +539,7 @@ def main(netcdf_path, output_dir, base_url, product, subfolder):
         print("Base URL:", base_url)
         print("Product:", product)
 
-    create_cog = "Yes"
+    create_cog = "No"
     if "Yes" in create_cog:
         for this_path, subdirs, files in os.walk(netcdf_path):
             for fname in files:
@@ -543,27 +549,31 @@ def main(netcdf_path, output_dir, base_url, product, subfolder):
                 gtiff_fname, file_path = getfilename(fname, output_dir)
                 dataset = gdal.Open(fname, gdal.GA_ReadOnly)
                 subdatasets = dataset.GetSubDatasets()
-                print(subdatasets)
                 # ---To Check if NETCDF is stacked or unstacked --
                 rastercount = gdal.Open(subdatasets[0][0]).RasterCount
                 dataset = None
-                stac_file = output_dir + file_path + "_STAC.json"
-                if not os.path.exists(stac_file):
-                    _write_dataset(fname, file_path, output_dir, rastercount)
-                    _write_cogtiff(gtiff_fname, output_dir, subdatasets,
-                                   rastercount)
+                # Create the YAML after creating the Tiffs.
+                # This allows to skip the datasets that are already processed.
+                yaml_file = output_dir + file_path + ".yaml"
+                if not os.path.exists(yaml_file):
                     logging.info("Writing COG to %s %s", file_path,
                                  basename(gtiff_fname))
+                    _write_cogtiff(gtiff_fname, output_dir, subdatasets,
+                                   rastercount)
+                    _write_dataset(fname, file_path, output_dir, rastercount)
                     time_it(1)
-                    return
-#                    create_one_json(base_url, output_dir, subfolder, product, verbose)
                 else:
-                    logging.info("File exists: %s", stac_file)
+                    logging.info("File exists: %s", yaml_file)
+                    time_it(1)
 
+    time_it(2)
     # Create the STAC json and catalogs
-#    create_jsons(base_url, output_dir, product, verbose)
+    create_jsons(base_url, output_dir, product, verbose, subfolder)
+    time_it(3)
 # ACT Tiles: -15_-40 -15_-41
 # ACT neighbours:  -14_-40 -14_-41
+# QLD: 18_-28
+# Sea: 9_-45
 
 if __name__ == "__main__":
     main()
