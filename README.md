@@ -118,6 +118,9 @@ Options:
   --help           Show this message and exit.
 ```
 
+# Create the STAC catalogs
+"The SpatioTemporal Asset Catalog (STAC) specification aims to standardize the way geospatial assets are exposed online and queried."[[1](https://github.com/radiantearth/stac-spec)]
+
 # Upload data to AWS S3 Bucket
 
 - Run the compute_sync.sh BASH script under the compute-sync folder as a PBS job and update more profile use case
