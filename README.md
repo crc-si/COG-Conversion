@@ -1,16 +1,16 @@
 # Cloud Optimized GeoTIFF Summary
 
 # TL;DR
-    - The two main organization techniques that Cloud Optimized GeoTIFF's use are Tiling and Overviews.
+    - The two main organization techniques that Cloud Optimized GeoTIFFs use are Tiling and Overviews.
     - HTTP Version 1.1 introduced a very cool feature called Range requests.
         - This document describes the two technologies to show how the two work together.
     - Convert the NetCDFs and save them as COGs to the output path provided.
         - Usage: netcdf-cog.py [OPTIONS]
-    - Geotiff- COG conversion
+    - GeoTIFF to COG conversion
         - Usage: geotiff-cog.py -p input_path -o output_path
-    - Validate the Geotiffs using the GDAL script
+    - Validate the GeoTIFFs using the GDAL script
         - Usage: validate_cloud_optimized_geotiff.py [-q] test.tif 
-    - Verify all GeoTIFF's
+    - Verify all GeoTIFFs
         - Usage: verify_cog.py -p input_path
     - Upload data to AWS S3 Bucket
         - Usage: aws s3 sync path s3://path --exclude '*.yaml' --exclude '*.xml'
@@ -77,8 +77,9 @@
     But they may download the whole file or large portions of it when only a very small part of the data is actually needed.
 
 
-# NETCDF- COG conversion
- NetCDF to COG conversion from NCI file system
+# NETCDF to COG conversion
+ 
+ NetCDF to COG conversion from NCI file system:
 
 - Convert the netcdfs that are on NCI g/data file system and save them to the output path provided
 - To use python script to convert to COG:
@@ -97,8 +98,9 @@
     --help             Show this message and exit.
 ```
 
-# Geotiff- COG conversion
- geotiff to cog conversion from NCI file system  
+# GeoTIFF to COG conversion
+
+ GeoTIFF to COG conversion from NCI file system:
  
 - Convert the Geotiff that are on NCI g/data file system and save them to the output path provided 
 - To use python script to convert Geotiffs to COG data:
@@ -116,7 +118,8 @@
     --help             Show this message and exit.
 ```
 
-# Validate the Geotiffs using the GDAL script
+# Validate the GeoTIFFs using the GDAL script
+
 - How to use the Validate_cloud_Optimized_Geotiff:  
 ```
 > $ python validate_cloud_optimized_geotiff.py --help  
@@ -124,7 +127,7 @@
 Usage: validate_cloud_optimized_geotiff.py [-q] test.tif  
 
 ```
-# To verify all GeoTIFF's, run the script:
+# Verify all GeoTIFFs
 ```
 > $python verify_cog.py --help
 
@@ -138,11 +141,11 @@ Options:
   --help           Show this message and exit.
 ```
 
-# Upload data to AWS S3 Bucket
+# Upload GeoTIFFs to AWS S3 Bucket
 
-- Run the compute_sync.sh BASH script under the compute-sync folder as a PBS job and update more profile use case
+- Run the bash script, compute_sync.sh, as a PBS job and update more profile use case
 
-- To run the script/ submit job - qsub compute-sync.sh
+- To run the script/submit job - qsub compute-sync.sh
 
 - Usage:
   ``` aws s3 sync {from_folder} {to_folder} --includes {include_specific_files} --excludes {exclude_specific_extension_files}
@@ -154,13 +157,16 @@ Options:
 
   ```
 # Create the STAC catalogs
+
 "The SpatioTemporal Asset Catalog (STAC) specification aims to standardize the way geospatial assets are exposed online and queried."[[1](https://github.com/radiantearth/stac-spec)]
 
 ## Objectives
+
 - Create the JSON files for STAC from the datasets
 - Upload them to the publicly available DEA data staging area
 
 ## Program Structure
+
 The program is written in Python, and is set to use the YAML files created by the GeoTIFF to COG conversion described above. The YAML file represents one dataset (NetCDF) and will contain the necessary info to create one a STAC JSON file for each. These JSON files, termed 'item catalogs', will be grouped together in a 'tile catalog' which in turn will be grouped together in a 'root catalog' as the hierarchy below shows.
 
 - Root
@@ -169,9 +175,11 @@ The program is written in Python, and is set to use the YAML files created by th
             - Assets
             
 ### Process Flow
+
 The code to create the STAC catalogs is run for each product (e.g. Fractionl Cover) after all tiles in it are processed to convert from NetCDF to GeoTIFF to COGs. It can be run as part of the above step or independently after the COGs and YAMLs are generated.
 
 ### How to Run
+
     - /g/data/u46/users/sa9525/avs/STAC/COG-Conversion/netcdf_cog.py -p /g/data/fk4/datacube/002/FC/LS8_OLI_FC/ -o /g/data/u46/users/sa9525/avs/STAC/FC/Tiles -b https://s3-ap-southeast-2.amazonaws.com/dea-public-data-dev -r FC -s -15_-40'
     
 where -p = input directory; -o = output directory; -b = base URL; -r = product code -s = tile ID
@@ -189,7 +197,7 @@ where -p = input directory; -o = output directory; -b = base URL; -r = product c
 
 # Upload STAC catalogs to AWS S3 Bucket
 
-Uploading the files follow the same method as shown above. Given below is a sample shell script that can be run to upload the STAC catalogs. The s3 bucket name must be changed to denote the correct one for DEA Staging.
+Uploading the files follow the same method as shown above. Given below is a sample shell script to upload the STAC catalogs. The s3 bucket name must be changed to denote the correct one for DEA Staging.
 
 ```
 #!/bin/bash
