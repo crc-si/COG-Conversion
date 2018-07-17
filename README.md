@@ -182,7 +182,7 @@ The code to create the STAC catalogs is run for each product (e.g. Fractionl Cov
 
     - /g/data/u46/users/sa9525/avs/STAC/COG-Conversion/netcdf_cog.py -p /g/data/fk4/datacube/002/FC/LS8_OLI_FC/ -o /g/data/u46/users/sa9525/avs/STAC/FC/Tiles -b https://s3-ap-southeast-2.amazonaws.com/dea-public-data-dev -r FC -s -15_-40'
     
-where -p = input directory; -o = output directory; -b = base URL; -r = product code -s = tile ID
+where p = input directory, o = output directory, b = base URL, r = product code, s = tile ID
 
 **NOTES**
 
