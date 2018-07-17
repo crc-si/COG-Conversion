@@ -121,6 +121,24 @@ Options:
 # Create the STAC catalogs
 "The SpatioTemporal Asset Catalog (STAC) specification aims to standardize the way geospatial assets are exposed online and queried."[[1](https://github.com/radiantearth/stac-spec)]
 
+## Objectives
+- Create the JSON files for STAC from the datasets
+- Upload them to the publicly available DEA data staging area
+
+## Program Structure
+The program is written in Python, and is set to use the YAML files created by the GeoTIFF to COG conversion described above. The YAML file represents one dataset (NetCDF) and will contain the necessary info to create one a STAC JSON file for each. These JSON files, termed 'item catalogs', will be grouped together in a 'tile catalog' which in turn will be grouped together in a 'root catalog' as the hierarchy below shows.
+
+- Root
+    - Tiles
+        - Items
+            - Assets
+            
+### Process flow
+The code to create the STAC catalogs is run for each product (e.g. Fractionl Cover) after all tiles in it are processed to convert from NetCDF to GeoTIFF to COGs. It can be run as part of the above step or independently after the COGs and YAMLs are generated.
+
+### How to run
+    - /g/data/u46/users/sa9525/avs/STAC/COG-Conversion/netcdf_cog.py -p /g/data/fk4/datacube/002/FC/LS8_OLI_FC/ -o /g/data/u46/users/sa9525/avs/STAC/FC/Test -b https://s3-ap-southeast-2.amazonaws.com/dea-public-data-dev -r FC -s -15_-40'
+
 # Upload data to AWS S3 Bucket
 
 - Run the compute_sync.sh BASH script under the compute-sync folder as a PBS job and update more profile use case

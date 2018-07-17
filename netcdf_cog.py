@@ -180,12 +180,13 @@ def create_catalogs(base_url, output_dir, pr_tile_item, tiles_list):
     tile_dir = os.path.join(output_dir, tile, "")
     items_list = os.listdir(tile_dir)
     item_jsons = []
+    # Item catalog. Each dataset is an item. 
     for item_json in items_list:
         if ".json" in item_json and "catalog" not in item_json:
             item_jsons.append({"href": item_json, "rel": "item"})
     catalog = {
         "name": tile,
-        "license": 'CC BY Attribution 4.0 International License',
+        "description": "Fractional Cover - List of items",
         "links":
         [
             {
@@ -200,26 +201,14 @@ def create_catalogs(base_url, output_dir, pr_tile_item, tiles_list):
                 "href": base_url + product + '/catalog.json',
                 "rel": "root"
             }
-        ],
-        "contact": {
-            "name": "Director, DEA Technologies, Geoscience Australia",
-            "email": "David.Gavin@ga.gov.au",
-            "phone": "+61 2 6249 9545",
-            "url": "http://www.ga.gov.au"
-        },
-        "formats": ["geotiff", "cog"],
-        "provider": {
-            "scheme": "s3",
-            "region": "ap-southeast-2",
-            "requesterPays": "false"
-        }
+        ]
     }
     for item_json in item_jsons:
         catalog['links'].append(item_json)
     with open('catalog.json', 'w') as dest:
         json.dump(catalog, dest, indent=1)
 
-    # Root catalog for the item(s) catalog.
+    # Root catalog for the tiles. Each tile is a child catalog.
     parent_catalog = '../catalog.json'
     parents_n_children = [
         {
@@ -233,34 +222,34 @@ def create_catalogs(base_url, output_dir, pr_tile_item, tiles_list):
         {
             "href": base_url + product + '/catalog.json',
             "rel": "root"
-        },
-        {
-            "license": 'CC BY Attribution 4.0 International License'
-        },
-        {
-            "contact": {
-                "name": "Director, DEA Technologies, Geoscience Australia",
-                "email": "David.Gavin@ga.gov.au",
-                "phone": "+61 2 6249 9545",
-                "url": "http://www.ga.gov.au"
-            }
-        },
-        {
-            "formats": ["geotiff", "cog"]
-        },
-        {
-            "provider": {
-                "scheme": "s3",
-                "region": "ap-southeast-2",
-                "requesterPays": "false"
-            }
         }
     ]
+
     for tile in tiles_list:
         tile_catalog = tile + "/catalog.json"
         parents_n_children.append({"href": tile_catalog, "rel": "child"})
     catalog = {
         "name": product,
+        "description": "Fractional Cover - List of tiles",
+		"license": {
+		  "name": "CC BY Attribution 4.0 International License",
+		  "copyright": "DEA, Geoscience Australia"
+		},
+		"contact": {
+			"name": "Commonwealth of Australia (Geoscience Australia)",
+			"email": "sales@ga.gov.au",
+			"phone": "+61 2 6249 9966",
+			"url": "http://www.ga.gov.au"
+		},
+		"formats": [
+			"geotiff",
+			"cog"
+		],
+		"provider": {
+			"scheme": "s3",
+			"region": "ap-southeast-2",
+			"requesterPays": "False"
+		},
         "links": parents_n_children
     }
     with open(parent_catalog, 'w') as dest:
@@ -542,7 +531,7 @@ def main(netcdf_path, output_dir, base_url, product, subfolder):
         print("Base URL:", base_url)
         print("Product:", product)
 
-    create_cog = "Yes"
+    create_cog = "No"
     if "Yes" in create_cog:
         for this_path, subdirs, files in os.walk(netcdf_path):
             for fname in files:
@@ -554,13 +543,9 @@ def main(netcdf_path, output_dir, base_url, product, subfolder):
                 logging.info("Sub-dirs: %s; Reading %s", subdirs,
                              basename(fname))
                 gtiff_fname, file_path = getfilename(fname, output_dir)
-#                dataset = gdal.Open(fname, gdal.GA_ReadOnly)
-#                subdatasets = dataset.GetSubDatasets()
-#                dataset = gdal.Open(fname, gdal.GA_ReadOnly)
                 subdatasets = gdal.Open(fname, gdal.GA_ReadOnly).GetSubDatasets()
                 # ---To Check if NETCDF is stacked or unstacked --
                 rastercount = gdal.Open(subdatasets[0][0]).RasterCount
-#                dataset = None
                 # Create the YAML after creating the Tiffs.
                 # This allows to skip the datasets that are already processed.
                 yaml_file = output_dir + file_path + ".yaml"
@@ -575,10 +560,10 @@ def main(netcdf_path, output_dir, base_url, product, subfolder):
                     logging.info("File exists: %s", yaml_file)
                     time_it(1)
 
-    time_it(2)
+#    time_it(2)
     # Create the STAC json and catalogs
-#    create_jsons(base_url, output_dir, product, verbose, subfolder)
-#    time_it(3)
+    create_jsons(base_url, output_dir, product, verbose, subfolder)
+    time_it(3)
 # ACT Tiles: -15_-40 -15_-41
 # ACT neighbours:  -14_-40 -14_-41
 # QLD: 18_-28
