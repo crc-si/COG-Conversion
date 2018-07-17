@@ -1,5 +1,25 @@
 # Cloud Optimized GeoTIFF Summary
 
+# TL;DR
+    - The two main organization techniques that Cloud Optimized GeoTIFF's use are Tiling and Overviews.
+    - HTTP Version 1.1 introduced a very cool feature called Range requests.
+        - This document describes the two technologies to show how the two work together.
+    - Convert the NetCDFs and save them as COGs to the output path provided.
+        - Usage: netcdf-cog.py [OPTIONS]
+    - Geotiff- COG conversion
+        - Usage: geotiff-cog.py -p input_path -o output_path
+    - Validate the Geotiffs using the GDAL script
+        - Usage: validate_cloud_optimized_geotiff.py [-q] test.tif 
+    - Verify all GeoTIFF's
+        - Usage: verify_cog.py -p input_path
+    - Upload data to AWS S3 Bucket
+        - Usage: aws s3 sync path s3://path --exclude '*.yaml' --exclude '*.xml'
+    - Create the STAC catalogs
+        - Usage: netcdf_cog.py -p input_path -o output_path -b base_url -r product_name -s tile_id
+    - Upload STAC catalogs to AWS S3 Bucket
+        - Usage: aws s3 sync stac_path s3://path --exclude '*.yaml'
+
+    
 #### Cloud Optimized GeoTIFF rely on two complementary pieces of technology.
 
     The first is the ability of GeoTIFF's to store not just the raw pixels of the image, but to organize those pixels in particular         ways. 
@@ -118,27 +138,6 @@ Options:
   --help           Show this message and exit.
 ```
 
-# Create the STAC catalogs
-"The SpatioTemporal Asset Catalog (STAC) specification aims to standardize the way geospatial assets are exposed online and queried."[[1](https://github.com/radiantearth/stac-spec)]
-
-## Objectives
-- Create the JSON files for STAC from the datasets
-- Upload them to the publicly available DEA data staging area
-
-## Program Structure
-The program is written in Python, and is set to use the YAML files created by the GeoTIFF to COG conversion described above. The YAML file represents one dataset (NetCDF) and will contain the necessary info to create one a STAC JSON file for each. These JSON files, termed 'item catalogs', will be grouped together in a 'tile catalog' which in turn will be grouped together in a 'root catalog' as the hierarchy below shows.
-
-- Root
-    - Tiles
-        - Items
-            - Assets
-            
-### Process flow
-The code to create the STAC catalogs is run for each product (e.g. Fractionl Cover) after all tiles in it are processed to convert from NetCDF to GeoTIFF to COGs. It can be run as part of the above step or independently after the COGs and YAMLs are generated.
-
-### How to run
-    - /g/data/u46/users/sa9525/avs/STAC/COG-Conversion/netcdf_cog.py -p /g/data/fk4/datacube/002/FC/LS8_OLI_FC/ -o /g/data/u46/users/sa9525/avs/STAC/FC/Test -b https://s3-ap-southeast-2.amazonaws.com/dea-public-data-dev -r FC -s -15_-40'
-
 # Upload data to AWS S3 Bucket
 
 - Run the compute_sync.sh BASH script under the compute-sync folder as a PBS job and update more profile use case
@@ -154,3 +153,57 @@ The code to create the STAC catalogs is run for each product (e.g. Fractionl Cov
        --exclude (string) Exclude all files or objects from the command that matches the specified pattern.
 
   ```
+# Create the STAC catalogs
+"The SpatioTemporal Asset Catalog (STAC) specification aims to standardize the way geospatial assets are exposed online and queried."[[1](https://github.com/radiantearth/stac-spec)]
+
+## Objectives
+- Create the JSON files for STAC from the datasets
+- Upload them to the publicly available DEA data staging area
+
+## Program Structure
+The program is written in Python, and is set to use the YAML files created by the GeoTIFF to COG conversion described above. The YAML file represents one dataset (NetCDF) and will contain the necessary info to create one a STAC JSON file for each. These JSON files, termed 'item catalogs', will be grouped together in a 'tile catalog' which in turn will be grouped together in a 'root catalog' as the hierarchy below shows.
+
+- Root
+    - Tiles
+        - Items
+            - Assets
+            
+### Process Flow
+The code to create the STAC catalogs is run for each product (e.g. Fractionl Cover) after all tiles in it are processed to convert from NetCDF to GeoTIFF to COGs. It can be run as part of the above step or independently after the COGs and YAMLs are generated.
+
+### How to Run
+    - /g/data/u46/users/sa9525/avs/STAC/COG-Conversion/netcdf_cog.py -p /g/data/fk4/datacube/002/FC/LS8_OLI_FC/ -o /g/data/u46/users/sa9525/avs/STAC/FC/Tiles -b https://s3-ap-southeast-2.amazonaws.com/dea-public-data-dev -r FC -s -15_-40'
+    
+where -p = input directory; -o = output directory; -b = base URL; -r = product code -s = tile ID
+
+**NOTES**
+
+    - Change the value to "No" in the following netcdf_cog.py line (534) if COGs have already been created.
+        - create_cog = "Yes"
+        
+    - If only intending to create the COGs, then comment out the line 565:
+        -     create_jsons(base_url, output_dir, product, verbose, subfolder)
+        
+    - In order to be able to run in parallel, each tile is processed separately. 
+        - Hence, it is necessary to have all tiles processed before running the STAC component of the program
+
+# Upload STAC catalogs to AWS S3 Bucket
+
+Uploading the files follow the same method as shown above. Given below is a sample shell script that can be run to upload the STAC catalogs. The s3 bucket name must be changed to denote the correct one for DEA Staging.
+
+```
+#!/bin/bash
+#PBS -q copyq
+#PBS -l walltime=10:00:00
+#PBS -l ncpus=1,mem=31GB
+#PBS -l wd
+
+
+module use /g/data/v10/public/modules/modulefiles/
+module load agdc-py3-prod
+
+aws s3 cp /g/data/u46/users/sa9525/avs/STAC/FC/Test/catalog.json s3://dea-public-data-dev/FC/
+aws s3 sync /g/data/u46/users/sa9525/avs/STAC/FC/Test/ s3://dea-public-data-dev/FC --exclude '*.yaml'
+```
+
+
