@@ -33,6 +33,9 @@ from pyproj import Proj, transform
 from dateutil.parser import parse
 import requests
 
+from xml.dom import minidom
+
+
 # ------------------------------------------------------------------------------
 # AVS debugging modules. Not required in production version.
 # If deleting, be sure to delete the function calls, 'time_it(n)'
@@ -87,6 +90,7 @@ def create_item_dict(item, ard_metadata, base_url, ard_metadata_file,
 
     # Convert the date to add time zone.
     center_dt = parse(ard_metadata['extent']['center_dt'])
+    center_dt = center_dt.replace(microsecond=0)
     time_zone = center_dt.tzinfo
     if not time_zone:
         center_dt = center_dt.replace(tzinfo=datetime.timezone.utc).isoformat()
@@ -115,11 +119,6 @@ def create_item_dict(item, ard_metadata, base_url, ard_metadata_file,
             }
         },
         'assets': {
-            'YAML': {
-                'href': base_url + item + "/" + ard_metadata_file,
-                "required": 'true',
-                "type": "yaml"
-            }
         }
     }
     bands = ard_metadata['image']['bands']
@@ -131,13 +130,13 @@ def create_item_dict(item, ard_metadata, base_url, ard_metadata_file,
             "type": "GeoTIFF"
         }
         # Metadata is for each band.
-        band_metadata = path + '.aux.xml'
-        key_metadata = key + '_metadata'
-        item_dict['assets'][key_metadata] = {
-            'href': band_metadata,
-            "required": 'false',
-            "type": "xml"
-        }
+#        band_metadata = path + '.aux.xml'
+#        key_metadata = key + '_metadata'
+#        item_dict['assets'][key_metadata] = {
+#            'href': band_metadata,
+#            "required": 'false',
+#            "type": "xml"
+#        }
     return item_dict
 
 
@@ -174,13 +173,15 @@ def create_catalogs(base_url, output_dir, pr_tile_item, tiles_list):
     4. Root catalog. Same as (2).
 
     """
+    
     product = pr_tile_item[0]
     tile = pr_tile_item[1]
 
     tile_dir = os.path.join(output_dir, tile, "")
     items_list = os.listdir(tile_dir)
     item_jsons = []
-    # Item catalog. Each dataset is an item. 
+
+	# Item catalog. Each dataset is an item. 
     for item_json in items_list:
         if ".json" in item_json and "catalog" not in item_json:
             item_jsons.append({"href": item_json, "rel": "item"})
@@ -208,7 +209,27 @@ def create_catalogs(base_url, output_dir, pr_tile_item, tiles_list):
     with open('catalog.json', 'w') as dest:
         json.dump(catalog, dest, indent=1)
 
-    # Root catalog for the tiles. Each tile is a child catalog.
+# Root catalog for the tiles. Each tile is a child catalog.
+    # Get the description from one XML file. They are the same in all Tifs
+    print(items_list[0])
+    if ".aux.xml" in items_list[0]:
+    	xml_1_file = items_list[0]
+    else:
+    	xml_1_file = items_list[0] + ".aux.xml"
+    xmldoc = minidom.parse(xml_1_file)
+    itemlist = xmldoc.getElementsByTagName('MDI')
+    keywords = ''
+    for s in itemlist:
+        key_value = s.attributes['key'].value
+        if "NC_GLOBAL#summary" in key_value:
+            description = s.childNodes[0].nodeValue
+            description = description.replace("\"", "")
+            description = description.replace("\n", " ")
+        if "NC_GLOBAL#keywords" in key_value and not keywords:
+            keywords = s.childNodes[0].nodeValue
+            keywords = keywords.replace("/", ",")
+            keywords = keywords.replace(" ,", ",")
+            keywords = keywords.split(",")   
     parent_catalog = '../catalog.json'
     parents_n_children = [
         {
@@ -230,26 +251,28 @@ def create_catalogs(base_url, output_dir, pr_tile_item, tiles_list):
         parents_n_children.append({"href": tile_catalog, "rel": "child"})
     catalog = {
         "name": product,
-        "description": "Fractional Cover - List of tiles",
-		"license": {
-		  "name": "CC BY Attribution 4.0 International License",
-		  "copyright": "DEA, Geoscience Australia"
-		},
-		"contact": {
-			"name": "Commonwealth of Australia (Geoscience Australia)",
-			"email": "sales@ga.gov.au",
-			"phone": "+61 2 6249 9966",
-			"url": "http://www.ga.gov.au"
-		},
-		"formats": [
-			"geotiff",
-			"cog"
-		],
-		"provider": {
-			"scheme": "s3",
-			"region": "ap-southeast-2",
-			"requesterPays": "False"
-		},
+        "description": description,
+        "license": {
+          "name": "CC BY Attribution 4.0 International License",
+          "copyright": "DEA, Geoscience Australia"
+        },
+        "contact": {
+            "name": "Commonwealth of Australia (Geoscience Australia)",
+            "email": "sales@ga.gov.au",
+            "phone": "+61 2 6249 9966",
+            "url": "http://www.ga.gov.au"
+        },
+        "formats": [
+            "geotiff",
+            "cog"
+        ],
+        "keywords": keywords,
+        "homepage": "http://www.ga.gov.au/",
+        "provider": {
+            "scheme": "s3",
+            "region": "ap-southeast-2",
+            "requesterPays": "False"
+        },
         "links": parents_n_children
     }
     with open(parent_catalog, 'w') as dest:
