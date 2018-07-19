@@ -1,0 +1,84 @@
+{
+    "create_cog": "No",
+    "create_stac": "Yes",
+    "verbose": 1,
+    "base_url": "http://dea-public-data-dev.s3-website-ap-southeast-2.amazonaws.com/",
+    "input_dir": "/g/data/fk4/datacube/002/FC/LS8_OLI_FC/",
+    "tiles": "ALL",
+    "output_dir": "/g/data/u46/users/sa9525/avs/STAC/FC/Test",
+    "product": {
+        "code": "FC_AVS",
+        "name": "Fractional Cover"
+    },
+    "description": [
+     "The Fractional Cover (FC) algorithm was developed by the Joint",
+     "Remote Sensing Research Program and is described in Scarth et al. (2010).",
+     "It has been implemented by Geoscience Australia for every observation from",
+     "Landsat Thematic Mapper (Landsat 5), Enhanced Thematic Mapper (Landsat 7)",
+     "and Operational Land Imager (Landsat 8) acquired since 1987. It is calculated",
+     "from terrain corrected surface reflectance (SR-NT_25_2.0.0).  FC_25 provides",
+     "a 25m scale fractional cover representation of the proportions of green",
+     "vegetation, non-green vegetation, and bare surface cover across the",
+     "Australian continent. The fractions are retrieved by inverting multiple",
+     "linear regression estimates and using synthetic endmembers in a constrained",
+     "non-negative least squares unmixing model. For further information please",
+     "see the articles below describing the method implemented which are free to",
+     "read:  Scarth, P, Roder, A and Schmidt, M 2010, 'Tracking grazing pressure",
+     "and climate interaction - the role of Landsat fractional cover in time series",
+     "analysis', Proceedings of the 15th Australasian Remote Sensing &",
+     "Photogrammetry Conference,  Schmidt, M, Denham, R and Scarth, P 2010,",
+     "'Fractional ground cover monitoring of pastures and agricultural areas in",
+     "Queensland', Proceedings of the 15th Australasian Remote Sensing &",
+     "Photogrammetry Conference  A summary of the algorithm developed by the",
+     "Joint Remote Sensing Centre is also available from the AusCover website,",
+     "http://www.auscover.org.au/purl/landsat-fractional-cover-jrsrp",
+     "Fractional cover data can be used to identify large scale patterns and",
+     "trends and inform evidence based decision making and policy on topics",
+     "including wind and water erosion risk, soil carbon dynamics, land management",
+     "practices and rangeland condition. This information is used by policy",
+     "agencies, natural and agricultural land resource managers, and scientists to",
+     "monitor land conditions over large areas over long time frames."
+    ],
+    "license": {
+        "name": "CC BY Attribution 4.0 International License",
+        "link": "https://creativecommons.org/licenses/by/4.0/",
+        "shortName": "CCA 4.0",
+        "copyright": "DEA, Geoscience Australia"
+    },
+    "contact": {
+        "name": "Commonwealth of Australia (Geoscience Australia)",
+        "email": "sales@ga.gov.au",
+        "phone": "+61 2 6249 9966",
+        "url": "http://www.ga.gov.au"
+    },
+    "formats": [
+        "geotiff",
+        "cog"
+    ],
+    "keywords": [
+        "AU",
+        "GA",
+        "NASA",
+        "GSFC",
+        "SED",
+        "ESD",
+        "LANDSAT",
+        "REFLECTANCE",
+        "ETM",
+        "TM",
+        "OLI",
+        "EARTH SCIENCE"
+    ],
+    "homepage": "http://www.ga.gov.au/",
+    "provider": {
+        "scheme": "s3",
+        "region": "ap-southeast-2",
+        "requesterPays": "False"
+    },
+    "bands": {
+        "PV": "Photosynthetic Vegetation",
+        "NPV": "Non-Photosynthetic Vegetation",
+        "BS": "Bare Soil",
+        "UE": "Unmixing Error"
+    }
+}
