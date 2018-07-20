@@ -252,14 +252,14 @@ where p = input directory, o = output directory, b = base URL, r = product code,
 
 **NOTES**
 
-    - If commandline execution, change the value to "No" in the following netcdf_cog.py line (510) if COGs have already been created.
+    - If commandline execution, change the value to "No" in the following line if COGs have already been created.
         - create_cog = "Yes"
         
-    - If only intending to create the COGs, then change the value to "No" in line 511:
+    - If only intending to create the COGs, then change the value to "No" in the line below.
         - create_stac = "Yes"
         
     - In order to be able to run in parallel, each tile is processed separately. 
-        - Hence, it is necessary to have all tiles processed before running the STAC component of the program
+        - Hence, it is necessary to have all tiles processed before running the STAC component of the program.
                 
 
 # Upload STAC catalogs to AWS S3 Bucket and Compile the STAC browser
