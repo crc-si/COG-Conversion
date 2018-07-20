@@ -42,7 +42,7 @@
     "license": {
         "name": "CC BY Attribution 4.0 International License",
         "link": "https://creativecommons.org/licenses/by/4.0/",
-        "shortName": "CCA 4.0",
+        "short_name": "CCA 4.0",
         "copyright": "DEA, Geoscience Australia"
     },
     "contact": {
