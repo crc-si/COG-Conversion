@@ -6,7 +6,7 @@
 #PBS -l wd
 
 module use /g/data/v10/public/modules/modulefiles/
-module load agdc-py3-prod
+module load dea
 
 # Create the JSONs for specified tiles. It overrides the value given in the config file.
 # ALL = all tiles in the output_dir. 

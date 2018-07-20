@@ -23,5 +23,3 @@ cd /g/data/u46/users/sa9525/avs/STAC/Stac_browser; NODE_ENV=development CATALOG_
 
 # Copy the Stac browser files to s3
 aws s3 sync /g/data/u46/users/sa9525/avs/STAC/Stac_browser/dist s3://dea-public-data-dev/$SUBDIR
-
-
