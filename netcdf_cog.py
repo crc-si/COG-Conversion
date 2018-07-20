@@ -176,7 +176,6 @@ def create_catalogs(base_url, output_dir, tiles_list, variables):
     """
     for tile in tiles_list:
         tile_dir = os.path.join(output_dir, tile, "")
-#        print("tile_dir: ", tile_dir)
         items_list = os.listdir(tile_dir)
         item_jsons = []
 
@@ -211,9 +210,7 @@ def create_catalogs(base_url, output_dir, tiles_list, variables):
             print("Writing Tile Catalog: ", tile_catalog)
         with open(tile_catalog, 'w') as dest:
             json.dump(catalog, dest, indent=1)
-
-
-# Root catalog for the tiles. Each tile is a child catalog.
+    # Root catalog for the tiles. Each tile is a child catalog.
     create_root_catalog(product, variables, base_url, output_dir)
 
 
@@ -235,7 +232,6 @@ def create_jsons(base_url, output_dir, verbose, tiles_list, variables):
         if os.path.exists(tile_dir):
             if verbose:
                 print("Analysing {}".format(tile_dir))
-#                continue
             os.chdir(tile_dir)
             for ard_metadata_file in glob.glob("*.yaml"):
                 item_json_file = ard_metadata_file.replace('.yaml',
@@ -437,16 +433,6 @@ def _write_cogtiff(out_f_name, outdir, subdatasets, rastercount):
                 run_command(cogtif, outdir)
 
 
-def sanity_check(base_url, product):
-    """
-    Check that the URL exists and is accessible.
-    """
-    base_url += product + "/"
-    request = requests.get(base_url)
-    if request.status_code != 200:
-        print('**** WARNING: Web site does not exist:', base_url)
-
-
 def create_cogs(netcdf_path, subfolder, output_dir):
     """
     Convert NetCDF to GeoTIFF and then to COGs
@@ -502,7 +488,6 @@ def create_variables(netcdf_path, output_dir, base_url, product, subfolder,
         contact = config_json['contact']
         homepage = config_json['homepage']
         provider = config_json['provider']
-#        provider_name = config_json['contact']['name']
         keywords = config_json['keywords']
         formats = config_json['formats']
         bands = config_json['bands']
@@ -630,8 +615,6 @@ def main(netcdf_path, output_dir, base_url, product, subfolder):
         print("config_file = ", config_file)
     variables = create_variables(netcdf_path, output_dir, base_url, product,
                                  subfolder, config_file)
-#    print(variables)
-#    return
     logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
                         level=logging.INFO)
     if variables['verbose']:
