@@ -16,8 +16,12 @@
         - Usage: aws s3 sync path s3://path --exclude '*.yaml' --exclude '*.xml'
     - Create the STAC catalogs
         - Usage: netcdf_cog.py -p input_path -o output_path -b base_url -r product_name -s tile_id
+            - Or, with a config file
     - Upload STAC catalogs to AWS S3 Bucket
         - Usage: aws s3 sync stac_path s3://path --exclude '*.yaml'
+    - Compile the STAC browser
+        - Usage: cd /g/data/u46/users/sa9525/avs/STAC/Stac_browser; NODE_ENV=development CATALOG_URL=http://dea-public-data-dev.s3-website-ap-southeast-2.amazonaws.com/$SUBDIR/catalog.json PATH_PREFIX=/FC_AVS/ yarn parcel build --public-url http://dea-public-data-dev.s3-website-ap-southeast-2.amazonaws.com/$SUBDIR/ index.html
+
 
     
 #### Cloud Optimized GeoTIFF rely on two complementary pieces of technology.
@@ -176,29 +180,93 @@ The program is written in Python, and is set to use the YAML files created by th
             
 ### Process Flow
 
-The code to create the STAC catalogs is run for each product (e.g. Fractionl Cover) after all tiles in it are processed to convert from NetCDF to GeoTIFF to COGs. It can be run as part of the above step or independently after the COGs and YAMLs are generated.
+The code to create the STAC catalogs is run for each product (e.g. Fractionl Cover) after all tiles in it are processed to convert from NetCDF to GeoTIFF to COGs. It can be run as part of this step or independently after the COGs and YAMLs are generated.
 
 ### How to Run
 
+This program can be run either by supplying all commandline parameters as below, or by specifying the params in a config file (recommended).
+
+#### Method 1: Commandline execution
     - /g/data/u46/users/sa9525/avs/STAC/COG-Conversion/netcdf_cog.py -p /g/data/fk4/datacube/002/FC/LS8_OLI_FC/ -o /g/data/u46/users/sa9525/avs/STAC/FC/Tiles -b https://s3-ap-southeast-2.amazonaws.com/dea-public-data-dev -r FC -s -15_-40'
     
 where p = input directory, o = output directory, b = base URL, r = product code, s = tile ID
 
+#### Method 2: Config file execution
+
+- Create a config file, named as 'netcdf_cog.json', in the working or program directory.
+
+```
+{
+    "create_cog": "No",
+    "create_stac": "Yes",
+    "verbose": 1,
+    "base_url": "http://dea-public-data-dev.s3-website-ap-southeast-2.amazonaws.com/",
+    "input_dir": "/g/data/fk4/datacube/002/FC/LS8_OLI_FC/",
+    "tiles": "ALL",
+    "output_dir": "/g/data/u46/users/sa9525/avs/STAC/FC/Test",
+    "product": {
+        "code": "FC_AVS",
+        "name": "Fractional Cover"
+    },
+    "description": [
+     "The Fractional Cover (FC) algorithm was developed by the Joint",
+     "..."
+    ],
+    "license": {
+        "name": "CC BY Attribution 4.0 International License",
+        "link": "https://creativecommons.org/licenses/by/4.0/",
+        "short_name": "CCA 4.0",
+        "copyright": "DEA, Geoscience Australia"
+    },
+    "contact": {
+        "name": "Commonwealth of Australia (Geoscience Australia)",
+        "organization": "Digital Earth Australia (DEA), Geoscience Australia",
+        "email": "sales@ga.gov.au",
+        "phone": "+61 2 6249 9966",
+        "url": "http://www.ga.gov.au"
+    },
+    "formats": [
+        "geotiff",
+        "cog"
+    ],
+    "keywords": [
+        "GA",
+        "...",
+        "EARTH SCIENCE"
+    ],
+    "homepage": "http://www.ga.gov.au/",
+    "provider": {
+        "scheme": "s3",
+        "region": "ap-southeast-2",
+        "requesterPays": "False"
+    },
+    "bands": {
+        "PV": "Photosynthetic Vegetation",
+        "NPV": "Non-Photosynthetic Vegetation",
+        "BS": "Bare Soil",
+        "UE": "Unmixing Error"
+    }
+}
+```
+- Run the program by `/path/to/program/netcdf_cog.py`
+
 **NOTES**
 
-    - Change the value to "No" in the following netcdf_cog.py line (534) if COGs have already been created.
+    - If commandline execution, change the value to "No" in the following netcdf_cog.py line (510) if COGs have already been created.
         - create_cog = "Yes"
         
-    - If only intending to create the COGs, then comment out the line 565:
-        -     create_jsons(base_url, output_dir, product, verbose, subfolder)
+    - If only intending to create the COGs, then change the value to "No" in line 511:
+        - create_stac = "Yes"
         
     - In order to be able to run in parallel, each tile is processed separately. 
         - Hence, it is necessary to have all tiles processed before running the STAC component of the program
+                
 
-# Upload STAC catalogs to AWS S3 Bucket
+# Upload STAC catalogs to AWS S3 Bucket and Compile the STAC browser
 
-Uploading the files follow the same method as shown above. Given below is a sample shell script to upload the STAC catalogs. The s3 bucket name must be changed to denote the correct one for DEA Staging.
+Given below is a sample shell script to upload the STAC catalogs, then compile the STAC browser and upload all required files again. The s3 bucket name and URLs must be changed to denote the correct one for DEA Staging.
 
+#### netcdf_cog_aws.sh
 ```
 #!/bin/bash
 #PBS -q copyq
@@ -206,12 +274,26 @@ Uploading the files follow the same method as shown above. Given below is a samp
 #PBS -l ncpus=1,mem=31GB
 #PBS -l wd
 
-
 module use /g/data/v10/public/modules/modulefiles/
-module load agdc-py3-prod
+module load dea
 
-aws s3 cp /g/data/u46/users/sa9525/avs/STAC/FC/Test/catalog.json s3://dea-public-data-dev/FC/
-aws s3 sync /g/data/u46/users/sa9525/avs/STAC/FC/Test/ s3://dea-public-data-dev/FC --exclude '*.yaml'
+# Usage: './netcdf_cog_aws.sh Subdir' 
+# e.g.	 './netcdf_cog_aws.sh FC' 
+export SUBDIR=$1
+if [ ! $SUBDIR ]
+then
+	echo "ERROR: Mandatory param missing: SUBDIR"
+	exit
+fi	
+# Upload the created COGs and STAC catalogs to s3
+aws s3 sync /g/data/u46/users/sa9525/avs/STAC/FC/Test/ s3://dea-public-data-dev/$SUBDIR --exclude '*.yaml' --exclude '*.xml'
+
+# Stac browser compilation
+cd /g/data/u46/users/sa9525/avs/STAC/Stac_browser; NODE_ENV=development CATALOG_URL=http://dea-public-data-dev.s3-website-ap-southeast-2.amazonaws.com/$SUBDIR/catalog.json PATH_PREFIX=/FC_AVS/ yarn parcel build --public-url http://dea-public-data-dev.s3-website-ap-southeast-2.amazonaws.com/$SUBDIR/ index.html
+
+# Copy the Stac browser files to s3
+aws s3 sync /g/data/u46/users/sa9525/avs/STAC/Stac_browser/dist s3://dea-public-data-dev/$SUBDIR
+
 ```
 
 
