@@ -18,14 +18,12 @@ import json
 import logging
 import os
 from os.path import join as pjoin, basename, dirname, exists, splitext
-#import sys
 import subprocess
 from subprocess import check_call
 import tempfile
 
 import datetime
 import re
-from xml.dom import minidom
 import click
 import xarray
 import yaml
@@ -37,12 +35,11 @@ from dateutil.parser import parse
 import requests
 
 
-
 # ------------------------------------------------------------------------------
 # CORE FUNCTIONS
 # ------------------------------------------------------------------------------
 def create_item_dict(item, ard_metadata, base_url,
-                     item_json_file, config_json):
+                     item_json_file, variables):
     """
     Create a dictionary structure of the required values.
 
@@ -54,26 +51,6 @@ def create_item_dict(item, ard_metadata, base_url,
     geodata = create_geodata(ard_metadata['grid_spatial']
                              ['projection']['valid_data']
                              ['coordinates'])
-
-    # Create the variables that go into item.json
-    provider = "Commonwealth of Australia (Geoscience Australia)"
-    license = "CC BY Attribution 4.0 International License"
-    copyright = "DEA, Geoscience Australia"
-    product_type = ard_metadata['product_type']
-    homepage = "http://www.ga.gov.au/"
-    provider = {
-        "scheme": "s3",
-        "region": "ap-southeast-2",
-        "requesterPays": "False"
-    },
-
-    if config_json:
-        provider_name = config_json['contact']['name']
-        license = config_json['license']['name']
-        copyright = config_json['license']['copyright']
-        product_type = config_json['product']['name']
-        homepage = config_json['homepage']
-        provider = config_json['provider']
 
     # Convert the date to add time zone.
     center_dt = parse(ard_metadata['extent']['center_dt'])
@@ -93,13 +70,13 @@ def create_item_dict(item, ard_metadata, base_url,
         'geometry': geodata['geometry'],
         'properties': {
             'datetime': center_dt,
-            'provider': provider_name,
-            'license': license,
-            'copyright': copyright,
-            'product_type': product_type,
-            'homepage': homepage
+            'provider': variables['contact']['name'],
+            'license': variables['license']['name'],
+            'copyright': variables['license']['copyright'],
+            'product_type': variables['product_name'],
+            'homepage': variables['homepage']
         },
-        'provider': provider,
+        'provider': variables['provider'],
         'links': {
             "self": {
                 'rel': 'self',
@@ -112,8 +89,7 @@ def create_item_dict(item, ard_metadata, base_url,
     bands = ard_metadata['image']['bands']
     for key in bands:
         path = ard_metadata['image']['bands'][key]['path']
-        if config_json:
-            key = config_json['bands'][key] + ' GeoTIFF'
+        key = variables['bands'][key] + ' GeoTIFF'
 
         item_dict['assets'][key] = {
             'href': path,
@@ -140,44 +116,15 @@ def create_geodata(valid_coord):
             "coordinates": valid_coord
         }
     }
-def create_root_catalog(product, config_json, items_list, base_url, output_dir):
-    keywords = ''
-    description = ''
-    product_name = product
-    if config_json:
-        # Take description and keywords from config_json
-        description = config_json['description']
-        description = ' '.join([str(x) for x in description])
-#        description = "Fractional Cover - Testing the desc"
-        keywords = config_json['keywords']
-        product_name = config_json['product']['name']
-        license = config_json['license']
-        contact = config_json['contact']
-        formats = config_json['formats']
-        homepage = config_json['homepage']
-        provider = config_json['provider']
 
-    else:
-        # Get the description from one XML file. They are the same in all Tifs
-        print(items_list[0])
-        if ".aux.xml" in items_list[0]:
-            xml_1_file = items_list[0]
-        else:
-            xml_1_file = items_list[0] + ".aux.xml"
-        xmldoc = minidom.parse(xml_1_file)
-        itemlist = xmldoc.getElementsByTagName('MDI')
-        for xml_item in itemlist:
-            key_value = xml_item.attributes['key'].value
-            if "NC_GLOBAL#summary" in key_value:
-                description = xml_item.childNodes[0].nodeValue
-                description = description.replace("\"", "")
-                description = description.replace("\n", " ")
-            if "NC_GLOBAL#keywords" in key_value and not keywords:
-                keywords = xml_item.childNodes[0].nodeValue
-                keywords = keywords.replace("/", ",")
-                keywords = keywords.replace(" ,", ",")
-                keywords = keywords.split(",")
-    parent_catalog = '../catalog.json'
+
+def create_root_catalog(product, variables, base_url, output_dir):
+    """
+    Create the Root catalog in the parent directory of tiles.
+    """
+    description = variables['description']
+    description = ' '.join([str(x) for x in description])
+    parent_catalog = output_dir + 'catalog.json'
     parents_n_children = [
         {
             "href": base_url + product + '/catalog.json',
@@ -192,57 +139,28 @@ def create_root_catalog(product, config_json, items_list, base_url, output_dir):
             "rel": "root"
         }
     ]
-
-    tiles_list = [name for name in os.listdir(output_dir)
-                  if os.path.isdir(os.path.join(output_dir, name))]
+    tiles_list = variables['tiles_list']
     for tile in tiles_list:
         tile_catalog = tile + "/catalog.json"
         parents_n_children.append({"href": tile_catalog, "rel": "child"})
-    if config_json:
-        catalog = {
-            "name": product_name,
-            "description": description,
-            "contact": contact,
-            "license": license,
-            "formats": formats,
-            "keywords": keywords,
-            "homepage": homepage,
-            "provider": provider,
-            "links": parents_n_children
-        }
-
-    else:
-        catalog = {
-            "name": product_name,
-            "description": description,
-            "license": {
-                "name": "CC BY Attribution 4.0 International License",
-                "copyright": "DEA, Geoscience Australia"
-            },
-            "contact": {
-                "name": "Commonwealth of Australia (Geoscience Australia)",
-                "email": "sales@ga.gov.au",
-                "phone": "+61 2 6249 9966",
-                "url": "http://www.ga.gov.au"
-            },
-            "formats": [
-                "geotiff",
-                "cog"
-            ],
-            "keywords": keywords,
-            "homepage": "http://www.ga.gov.au/",
-            "provider": {
-                "scheme": "s3",
-                "region": "ap-southeast-2",
-                "requesterPays": "False"
-            },
-            "links": parents_n_children
-        }
+    catalog = {
+        "name": variables['product_name'],
+        "description": description,
+        "contact": variables['contact'],
+        "license": variables['license'],
+        "formats": variables['formats'],
+        "keywords": variables['keywords'],
+        "homepage": variables['homepage'],
+        "provider": variables['provider'],
+        "links": parents_n_children
+    }
+    if variables['verbose']:
+        print("Writing Root Catalog: ", parent_catalog)
     with open(parent_catalog, 'w') as dest:
         json.dump(catalog, dest, indent=1)
 
 
-def create_catalogs(base_url, output_dir, tiles_list, config_json):
+def create_catalogs(base_url, output_dir, tiles_list, variables):
     """
     There are several catalogs to be craeted as below.
 
@@ -258,6 +176,7 @@ def create_catalogs(base_url, output_dir, tiles_list, config_json):
     """
     for tile in tiles_list:
         tile_dir = os.path.join(output_dir, tile, "")
+#        print("tile_dir: ", tile_dir)
         items_list = os.listdir(tile_dir)
         item_jsons = []
 
@@ -265,7 +184,7 @@ def create_catalogs(base_url, output_dir, tiles_list, config_json):
         for item_json in items_list:
             if ".json" in item_json and "catalog" not in item_json:
                 item_jsons.append({"href": item_json, "rel": "item"})
-        product = config_json['product']['code']
+        product = variables['product']
         catalog = {
             "name": tile,
             "description": "Fractional Cover - List of items",
@@ -287,14 +206,18 @@ def create_catalogs(base_url, output_dir, tiles_list, config_json):
         }
         for item_json in item_jsons:
             catalog['links'].append(item_json)
-        with open('catalog.json', 'w') as dest:
+        tile_catalog = tile_dir + 'catalog.json'
+        if variables['verbose']:
+            print("Writing Tile Catalog: ", tile_catalog)
+        with open(tile_catalog, 'w') as dest:
             json.dump(catalog, dest, indent=1)
 
 
 # Root catalog for the tiles. Each tile is a child catalog.
-    create_root_catalog(product, config_json, items_list, base_url, output_dir)
+    create_root_catalog(product, variables, base_url, output_dir)
 
-def create_jsons(base_url, output_dir, verbose, tiles_list, config_json):
+
+def create_jsons(base_url, output_dir, verbose, tiles_list, variables):
     """
     Iterate through all tile directories and create a JSON file for each
     YAML file in there. These JSONs will be saved as *_STAC.json.
@@ -312,6 +235,7 @@ def create_jsons(base_url, output_dir, verbose, tiles_list, config_json):
         if os.path.exists(tile_dir):
             if verbose:
                 print("Analysing {}".format(tile_dir))
+#                continue
             os.chdir(tile_dir)
             for ard_metadata_file in glob.glob("*.yaml"):
                 item_json_file = ard_metadata_file.replace('.yaml',
@@ -321,7 +245,7 @@ def create_jsons(base_url, output_dir, verbose, tiles_list, config_json):
                         ard_metadata = yaml.safe_load(ard_src)
 
                     item_dict = create_item_dict(tile, ard_metadata, base_url,
-                                                 item_json_file, config_json)
+                                                 item_json_file, variables)
 
                     #  Write out the Item JSON file.
                     if verbose:
@@ -444,7 +368,7 @@ def _write_cogtiff(out_f_name, outdir, subdatasets, rastercount):
                 # In the case of FC Percentile, skip two bands as below.
                 # It does not apply in FC Products
                 if band_name.endswith('_observed_date')\
-                or band_name.endswith('_source'):
+                   or band_name.endswith('_source'):
                     continue
 
                 if rastercount > 1:
@@ -524,6 +448,9 @@ def sanity_check(base_url, product):
 
 
 def create_cogs(netcdf_path, subfolder, output_dir):
+    """
+    Convert NetCDF to GeoTIFF and then to COGs
+    """
     netcdf_path = os.path.join(netcdf_path, subfolder)
     for this_path, subdirs, files in os.walk(netcdf_path):
         for fname in files:
@@ -551,6 +478,124 @@ def create_cogs(netcdf_path, subfolder, output_dir):
                 logging.info("File exists: %s", yaml_file)
 
 
+def create_variables(netcdf_path, output_dir, base_url, product, subfolder,
+                     config_file):
+    """
+    Create all variables into a hash array. This will save declaring too many
+    local variables.
+    """
+    config_json = ''
+    if os.path.exists(config_file):
+        with open(config_file) as infile:
+            config_json = json.load(infile)
+    if config_json:
+        netcdf_path = config_json['input_dir']
+        output_dir = config_json['output_dir']
+        base_url = config_json['base_url']
+        description = config_json['description']
+        product = config_json['product']['code']
+        product_name = config_json['product']['name']
+        create_cog = config_json['create_cog']
+        create_stac = config_json['create_stac']
+        verbose = config_json['verbose']
+        licence = config_json['license']
+        contact = config_json['contact']
+        homepage = config_json['homepage']
+        provider = config_json['provider']
+#        provider_name = config_json['contact']['name']
+        keywords = config_json['keywords']
+        formats = config_json['formats']
+        bands = config_json['bands']
+    else:
+        create_cog = "No"
+        create_stac = "Yes"
+        verbose = 1
+        product_name = "Fractional Cover"
+        homepage = "http://www.ga.gov.au/"
+        licence = {
+            "name": "CC BY Attribution 4.0 International License",
+            "link": "https://creativecommons.org/licenses/by/4.0/",
+            "short_name": "CCA 4.0",
+            "copyright": "DEA, Geoscience Australia"
+        }
+        contact = {
+            "name": "Commonwealth of Australia (Geoscience Australia)",
+            "organization": "Digital Earth Australia (DEA), Geoscience Australia",
+            "email": "sales@ga.gov.au",
+            "phone": "+61 2 6249 9966",
+            "url": "http://www.ga.gov.au"
+        }
+        provider = {
+            "scheme": "s3",
+            "region": "ap-southeast-2",
+            "requesterPays": "False"
+        }
+        bands = {
+            "PV": "Photosynthetic Vegetation",
+            "NPV": "Non-Photosynthetic Vegetation",
+            "BS": "Bare Soil",
+            "UE": "Unmixing Error"
+        }
+        keywords = [
+            "AU",
+            "GA",
+            "NASA",
+            "GSFC",
+            "SED",
+            "ESD",
+            "LANDSAT",
+            "REFLECTANCE",
+            "ETM",
+            "TM",
+            "OLI",
+            "EARTH SCIENCE"
+        ]
+        formats = [
+            "geotiff",
+            "cog"
+        ]
+
+    output_dir = os.path.join(output_dir, '')
+    base_url = os.path.join(base_url, '')
+    tiles_list = []
+    try:
+        tiles_list = os.environ['TILES'].split(',')
+    except KeyError as keyerror:
+        print("INFO: Not defined:", keyerror)
+
+    # If not from env, take the tile numbers from config file
+    if not tiles_list:
+        tiles_list = config_json['tiles'].split(',')
+
+    if "ALL" in tiles_list[0]:
+        tiles_list = [name for name in os.listdir(output_dir)
+                      if os.path.isdir(os.path.join(output_dir, name))]
+
+    if not subfolder:
+        subfolder = tiles_list[0]
+    variables = {
+        "netcdf_path": netcdf_path,
+        "output_dir": output_dir,
+        "subfolder": subfolder,
+        "base_url": base_url,
+        "homepage": homepage,
+        "description": description,
+        "product": product,
+        "product_name": product_name,
+        "provider": provider,
+        "license": licence,
+        "contact": contact,
+        "create_cog": create_cog,
+        "create_stac": create_stac,
+        "verbose": verbose,
+        "tiles_list": tiles_list,
+        "bands": bands,
+        "formats": formats,
+        "keywords": keywords
+    }
+    return variables
+
+
 @click.command(help="""\b Convert netcdf to Geotiff and then to Cloud
                     Optimized Geotiff using gdal."""
                     " Mandatory Requirement: GDAL version should be >=2.2")
@@ -573,67 +618,39 @@ def main(netcdf_path, output_dir, base_url, product, subfolder):
     Optimized Geotiff. A *.yaml file is created for each NetCDF. These YAMLs
     are used by the STAC creation module to create 'item.json' for each *.nc.
     """
-    # These can be overridden in 'netcdf_cog.json'
-    create_cog = "No"
-    create_stac = "Yes"
-    verbose = 1
     # Config file: netcdf_cog.json in CWD or Program dir
     config_file = './netcdf_cog.json'
-    config_json = ''
-    if(not netcdf_path or not output_dir or not base_url or not product or not subfolder):
+    if(not netcdf_path or not output_dir or not base_url or not
+       product or not subfolder):
         if os.path.exists(config_file):
             pass
         else:
             mypath = os.path.dirname(os.path.realpath(__file__))
             config_file = mypath + '/netcdf_cog.json'
         print("config_file = ", config_file)
-        if os.path.exists(config_file):
-            with open(config_file) as infile:
-                config_json = json.load(infile)
-#    create_variables(netcdf_path, output_dir, base_url, product, subfolder, config_json)                    
-        netcdf_path = config_json['input_dir']
-        output_dir = config_json['output_dir']
-        base_url = config_json['base_url']
-        product = config_json['product']['code']
-#        tiles = config_json['tiles']
-        create_cog = config_json['create_cog']
-        create_stac = config_json['create_stac']
-        verbose = config_json['verbose']
-
+    variables = create_variables(netcdf_path, output_dir, base_url, product,
+                                 subfolder, config_file)
+#    print(variables)
+#    return
     logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
                         level=logging.INFO)
-    # Add the ending slash if not present
-    output_dir = os.path.join(output_dir, '')
-    base_url = os.path.join(base_url, '')
-    if verbose:
-        print("Input dir:", netcdf_path)
-        print("Output dir:", output_dir)
-        print("Base URL:", base_url)
-        print("Product:", product)
+    if variables['verbose']:
+        print("Input dir:", variables['netcdf_path'])
+        print("Output dir:", variables['output_dir'])
+        print("Base URL:", variables['base_url'])
+        print("Product:", variables['product'])
 
-    if "Yes" in create_cog:
-        create_cogs(netcdf_path, subfolder, output_dir)
+    if "Yes" in variables['create_cog']:
+        create_cogs(variables['netcdf_path'], variables['subfolder'],
+                    variables['output_dir'])
     # Create the STAC json and catalogs
-    if "Yes" in create_stac:
-        # Take the tile numbers as an env variable. ALL = all tiles
-        tiles_list = []
-        try:
-            tiles_list = os.environ['TILES'].split(',')
-        except KeyError as keyerror:
-            print("INFO: Not defined:", keyerror)
-
-        # If not from env, take the tile numbers from config file
-        if not tiles_list:
-            tiles_list = config_json['tiles'].split(',')
-
-        if "ALL" in tiles_list[0]:
-            tiles_list = [name for name in os.listdir(output_dir)
-                          if os.path.isdir(os.path.join(output_dir, name))]
-        print("tiles_list: ", tiles_list)
-        create_jsons(base_url, output_dir, verbose, tiles_list, config_json)
-        if verbose:
-            print("Writing the catalog.json for: {}".format(tiles_list))
-        create_catalogs(base_url, output_dir, tiles_list, config_json)
+    if "Yes" in variables['create_stac']:
+        create_jsons(variables['base_url'], variables['output_dir'],
+                     variables['verbose'], variables['tiles_list'], variables)
+        if variables['verbose']:
+            print("Writing catalog.json: {}".format(variables['tiles_list']))
+        create_catalogs(variables['base_url'], variables['output_dir'],
+                        variables['tiles_list'], variables)
 
 if __name__ == "__main__":
     main()

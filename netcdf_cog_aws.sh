@@ -5,11 +5,10 @@
 #PBS -l wd
 
 module use /g/data/v10/public/modules/modulefiles/
-module load agdc-py3-prod
+module load dea
 
-# Change this to the catalog 'root directory'
 # Usage: './netcdf_cog_aws.sh Subdir' 
-# 		 './netcdf_cog_aws.sh FC' 
+# e.g.	 './netcdf_cog_aws.sh FC' 
 export SUBDIR=$1
 if [ ! $SUBDIR ]
 then
@@ -17,7 +16,6 @@ then
 	exit
 fi	
 # Upload the created COGs and STAC catalogs to s3
-#aws s3 cp /g/data/u46/users/sa9525/avs/STAC/FC/Test/catalog.json s3://dea-public-data-dev/$SUBDIR/
 aws s3 sync /g/data/u46/users/sa9525/avs/STAC/FC/Test/ s3://dea-public-data-dev/$SUBDIR --exclude '*.yaml' --exclude '*.xml'
 
 # Stac browser compilation
