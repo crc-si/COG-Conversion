@@ -21,6 +21,8 @@
         - Usage: aws s3 sync stac_path s3://path --exclude '*.yaml'
     - Compile the STAC browser
         - Usage: cd /g/data/u46/users/sa9525/avs/STAC/Stac_browser; NODE_ENV=development CATALOG_URL=http://dea-public-data-dev.s3-website-ap-southeast-2.amazonaws.com/$SUBDIR/catalog.json PATH_PREFIX=/FC_AVS/ yarn parcel build --public-url http://dea-public-data-dev.s3-website-ap-southeast-2.amazonaws.com/$SUBDIR/ index.html
+    - Upload the Stac browser files to s3
+        - aws s3 sync /g/data/u46/users/sa9525/avs/STAC/Stac_browser/dist s3://dea-public-data-dev/$SUBDIR
 
 
     
