@@ -465,13 +465,13 @@ def create_cogs(netcdf_path, subfolder, output_dir):
 
 
 def create_variables(netcdf_path, output_dir, base_url, product, subfolder,
-                     config_file):
+                     config_file, commandline):
     """
     Create all variables into a hash array. This will save declaring too many
     local variables.
     """
     config_json = ''
-    if os.path.exists(config_file):
+    if os.path.exists(config_file) and not commandline:
         with open(config_file) as infile:
             config_json = json.load(infile)
     if config_json:
@@ -496,6 +496,36 @@ def create_variables(netcdf_path, output_dir, base_url, product, subfolder,
         create_stac = "Yes"
         verbose = 1
         product_name = "Fractional Cover"
+        description = """The Fractional Cover (FC) algorithm was developed by
+        the Joint Remote Sensing Research Program and is described in Scarth
+        et al. (2010). It has been implemented by Geoscience Australia for
+        every observation from Landsat Thematic Mapper (Landsat 5), Enhanced
+        Thematic Mapper (Landsat 7) and Operational Land Imager (Landsat 8)
+        acquired since 1987. It is calculated from terrain corrected surface
+        reflectance (SR-NT_25_2.0.0). FC_25 provides a 25m scale fractional
+        cover representation of the proportions of green vegetation, non-green
+        vegetation, and bare surface cover across the Australian continent.
+        The fractions are retrieved by inverting multiple linear regression
+        estimates and using synthetic endmembers in a constrained non-negative
+        least squares unmixing model. For further information please see the
+        articles below describing the method implemented which are free to
+        read: Scarth, P, Roder, A and Schmidt, M 2010, 'Tracking grazing
+        pressure and climate interaction - the role of Landsat fractional
+        cover in time series analysis', Proceedings of the 15th Australasian
+        Remote Sensing & Photogrammetry Conference, Schmidt, M, Denham, R and
+        Scarth, P 2010, 'Fractional ground cover monitoring of pastures and
+        agricultural areas in Queensland', Proceedings of the 15th Australasian
+        Remote Sensing & Photogrammetry Conference A summary of the algorithm
+        developed by the Joint Remote Sensing Centre is also available from the
+        AusCover website, http://www.auscover.org.au/purl/landsat-fractional-cover-jrsrp
+        Fractional cover data can be used to identify large scale patterns and
+        trends and inform evidence based decision making and policy on topics
+        including wind and water erosion risk, soil carbon dynamics, land
+        management practices and rangeland condition. This information is used
+        by policy agencies, natural and agricultural land resource managers,
+        and scientists to monitor land conditions over large areas over long
+        time frames.
+        """
         homepage = "http://www.ga.gov.au/"
         licence = {
             "name": "CC BY Attribution 4.0 International License",
@@ -539,19 +569,20 @@ def create_variables(netcdf_path, output_dir, base_url, product, subfolder,
             "geotiff",
             "cog"
         ]
-
+        
     output_dir = os.path.join(output_dir, '')
     base_url = os.path.join(base_url, '')
     tiles_list = []
+    if commandline:
+        tiles_list = [subfolder]
     try:
         tiles_list = os.environ['TILES'].split(',')
     except KeyError as keyerror:
-        print("INFO: Not defined:", keyerror)
+        pass
 
     # If not from env, take the tile numbers from config file
     if not tiles_list:
         tiles_list = config_json['tiles'].split(',')
-
     if "ALL" in tiles_list[0]:
         tiles_list = [name for name in os.listdir(output_dir)
                       if os.path.isdir(os.path.join(output_dir, name))]
@@ -605,16 +636,17 @@ def main(netcdf_path, output_dir, base_url, product, subfolder):
     """
     # Config file: netcdf_cog.json in CWD or Program dir
     config_file = './netcdf_cog.json'
+    commandline = 1
     if(not netcdf_path or not output_dir or not base_url or not
        product or not subfolder):
+        commandline = 0
         if os.path.exists(config_file):
             pass
         else:
             mypath = os.path.dirname(os.path.realpath(__file__))
             config_file = mypath + '/netcdf_cog.json'
-        print("config_file = ", config_file)
     variables = create_variables(netcdf_path, output_dir, base_url, product,
-                                 subfolder, config_file)
+                                 subfolder, config_file, commandline)
     logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
                         level=logging.INFO)
     if variables['verbose']:
