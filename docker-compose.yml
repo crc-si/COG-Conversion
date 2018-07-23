@@ -1,0 +1,7 @@
+version: "3.2"
+services:
+  gdal:
+    build: .
+    volumes:
+      - ./:/data
+    command: gdalinfo --version

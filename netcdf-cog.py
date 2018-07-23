@@ -8,7 +8,7 @@ import logging
 from osgeo import gdal
 import xarray
 import yaml
-from yaml import CLoader as Loader, CDumper as Dumper
+from yaml import Loader, Dumper
 import rasterio
 import numpy
 
